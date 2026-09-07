@@ -29,7 +29,7 @@ button{min-height:46px;border:0;border-radius:10px;font-weight:800;font-size:14p
   <div class="head">
     <div>
       <h1>📷 Live Barcode Scanner</h1>
-      <div class="sub">Point the rear camera at the barcode. Detection is automatic—no photo button.</div>
+      <div class="sub">Point the rear camera at the barcode. Detection is automatic—no photo button. After detection, the scanner returns to the POS automatically.</div>
     </div>
     <div class="badge">AUTO DETECT</div>
   </div>
@@ -49,6 +49,7 @@ button{min-height:46px;border:0;border-radius:10px;font-weight:800;font-size:14p
 const qs = new URLSearchParams(location.search);
 const context = (qs.get('context') || 'SALE').toUpperCase();
 const returnOrigin = qs.get('returnOrigin') || '';
+const returnUrl = qs.get('returnUrl') || '';
 const statusEl = document.getElementById('status');
 const retryBtn = document.getElementById('retry');
 
@@ -96,7 +97,22 @@ async function sendBarcode(code){
     }
   }catch(e){}
 
-  setStatus('Detected: ' + code + '. Return to the POS; automatic return was blocked by the browser.', 'ok');
+  // Messenger/Facebook and some in-app browsers deliberately remove window.opener.
+  // In that case, redirect this scanner tab back to the POS with only the scanned
+  // barcode + context. The POS consumes and removes these parameters after auth.
+  if(returnUrl){
+    try{
+      const u=new URL(returnUrl);
+      u.searchParams.set('scanCode',code);
+      u.searchParams.set('scanContext',context);
+      u.searchParams.set('scanTs',String(Date.now()));
+      setStatus('Detected: ' + code + ' · returning to POS…', 'ok');
+      setTimeout(()=>location.replace(u.toString()),220);
+      return;
+    }catch(e){}
+  }
+
+  setStatus('Detected: ' + code + '. Automatic return was blocked. Tap Close and return to the POS.', 'ok');
   resolved = false;
 }
 

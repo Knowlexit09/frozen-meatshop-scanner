@@ -1,196 +1,43 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#991b1b">
-<title>Frozen Meatshop Live Scanner</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#991b1b"><title>Frozen Meatshop Live Scanner</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
-*{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:#0f172a;font-family:Arial,sans-serif}
-.shell{max-width:560px;min-height:100vh;margin:auto;background:#fff;padding:14px;display:flex;flex-direction:column}
-.head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-h1{font-size:20px;margin:0}.sub{font-size:12px;color:#64748b;margin-top:4px}
-.badge{font-size:10px;font-weight:800;background:#fee2e2;color:#991b1b;border-radius:999px;padding:5px 8px;white-space:nowrap}
-#reader{width:100%;min-height:330px;margin-top:12px;border-radius:14px;overflow:hidden;background:#111827}
-.status{margin-top:10px;padding:10px;border:1px solid #e5e7eb;border-radius:10px;background:#f8fafc;font-size:12px;line-height:1.45}
-.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
-button{min-height:46px;border:0;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer}
-.primary{background:#b91c1c;color:#fff}.light{background:#f1f5f9;color:#111827}
-.ok{background:#dcfce7!important;border-color:#86efac!important;color:#166534}
-.err{background:#fee2e2!important;border-color:#fecaca!important;color:#991b1b}
-.hint{margin-top:auto;padding-top:14px;color:#64748b;font-size:11px;text-align:center}
-@media(max-width:420px){.actions{grid-template-columns:1fr}#reader{min-height:300px}}
-</style>
-</head>
-<body>
-<div class="shell">
-  <div class="head">
-    <div>
-      <h1>📷 Live Barcode Scanner</h1>
-      <div class="sub">Point the rear camera at the barcode. Detection is automatic—no photo button. After detection, the scanner returns to the POS automatically.</div>
-    </div>
-    <div class="badge">AUTO DETECT</div>
-  </div>
-
-  <div id="reader"></div>
-  <div id="status" class="status">Starting rear camera…</div>
-
-  <div class="actions">
-    <button id="retry" class="primary" type="button">Retry Camera</button>
-    <button id="close" class="light" type="button">Close</button>
-  </div>
-
-  <div class="hint">EAN-13 · EAN-8 · UPC-A/E · CODE-128 · CODE-39 · QR</div>
-</div>
-
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#0f172a;font-family:Arial,sans-serif}.shell{max-width:560px;min-height:100vh;margin:auto;background:#fff;padding:14px;display:flex;flex-direction:column}.head{display:flex;justify-content:space-between;gap:10px}h1{font-size:20px;margin:0}.sub{font-size:12px;color:#64748b;margin-top:4px}.badge{font-size:10px;font-weight:800;background:#fee2e2;color:#991b1b;border-radius:999px;padding:5px 8px;white-space:nowrap}#reader{width:100%;min-height:315px;margin-top:12px;border-radius:14px;overflow:hidden;background:#111827}.status,.result{margin-top:10px;padding:10px;border:1px solid #e5e7eb;border-radius:10px;background:#f8fafc;font-size:12px;line-height:1.45}.result{display:none}.result.ok{display:block;background:#f0fdf4;border-color:#86efac;color:#166534}.result.err{display:block;background:#fef2f2;border-color:#fecaca;color:#991b1b}.result .name{font-size:18px;font-weight:900}.result .meta{margin-top:4px;font-weight:700}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}button{min-height:48px;border:0;border-radius:10px;font-weight:800;font-size:14px}.primary{background:#b91c1c;color:#fff}.light{background:#f1f5f9;color:#111827}.ok{background:#dcfce7!important;color:#166534}.err{background:#fee2e2!important;color:#991b1b}.hint{margin-top:auto;padding-top:14px;color:#64748b;font-size:11px;text-align:center}@media(max-width:420px){.actions{grid-template-columns:1fr}#reader{min-height:285px}}
+</style></head>
+<body><div class="shell">
+<div class="head"><div><h1>📷 Live Barcode Scanner</h1><div class="sub" id="modeText">Point camera at barcode.</div></div><div class="badge" id="modeBadge">AUTO DETECT</div></div>
+<div id="reader"></div><div id="status" class="status">Starting rear camera…</div><div id="result" class="result"></div>
+<div class="actions"><button id="retry" class="primary" type="button">Retry Camera</button><button id="done" class="light" type="button">Done Scanning</button></div>
+<div class="hint">EAN-13 · EAN-8 · UPC-A/E · CODE-128 · CODE-39 · QR</div></div>
 <script>
-const qs = new URLSearchParams(location.search);
-const context = (qs.get('context') || 'SALE').toUpperCase();
-const returnOrigin = qs.get('returnOrigin') || '';
-const returnUrl = qs.get('returnUrl') || '';
-const statusEl = document.getElementById('status');
-const retryBtn = document.getElementById('retry');
-
-let scanner = null;
-let running = false;
-let resolved = false;
-let lastCode = '';
-let lastAt = 0;
-
-function setStatus(text, cls){
-  statusEl.textContent = text;
-  statusEl.className = 'status' + (cls ? ' ' + cls : '');
+const qs=new URLSearchParams(location.search),context=(qs.get('context')||'SALE').toUpperCase(),returnOrigin=qs.get('returnOrigin')||'',returnUrl=qs.get('returnUrl')||'';
+const wantsContinuous=qs.get('continuous')==='1'&&context==='SALE',canTalkToPos=!!(window.opener&&!window.opener.closed&&returnOrigin),continuous=wantsContinuous&&canTalkToPos;
+const statusEl=document.getElementById('status'),resultEl=document.getElementById('result'),retryBtn=document.getElementById('retry');
+document.getElementById('modeBadge').textContent=continuous?'CONTINUOUS':'AUTO DETECT';
+document.getElementById('modeText').textContent=continuous?'Scan item after item. Tap Done Scanning only when cashier is finished.':(wantsContinuous&&!canTalkToPos?'In-app browser: one scan returns to POS. Open POS in Chrome/Safari for continuous mode.':'Point camera at barcode. Detection is automatic.');
+let scanner=null,running=false,processing=false,lastCode='',lastAt=0;
+function esc(v){return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function status(t,c){statusEl.textContent=t;statusEl.className='status'+(c?' '+c:'')}
+function result(d){resultEl.className='result '+(d&&d.ok?'ok':'err');resultEl.innerHTML=(d&&d.productName?'<div class="name">'+esc(d.productName)+'</div>':'')+'<div class="meta">'+esc((d&&d.unit||'')+(d&&d.boxNo?' · Box #'+d.boxNo:'')+(d&&Number(d.actualKg)>0?' · '+Number(d.actualKg).toFixed(3)+' KG':'')+(d&&d.qty?' · Qty '+d.qty:''))+'</div><div>'+esc(d&&d.message||'')+'</div>'}
+async function stop(){if(!scanner)return;try{if(running)await scanner.stop()}catch(e){}try{scanner.clear()}catch(e){}scanner=null;running=false}
+async function decoded(code){
+ code=String(code||'').trim();if(!code||processing)return;const now=Date.now();if(code===lastCode&&now-lastAt<1300)return;lastCode=code;lastAt=now;processing=true;try{if(navigator.vibrate)navigator.vibrate(70)}catch(e){}status('Detected '+code+' · validating in POS…');
+ if(canTalkToPos){try{window.opener.postMessage({type:'FROZEN_POS_BARCODE',code:code,context:context},returnOrigin);if(!continuous){await stop();status('Sent to POS. Returning…','ok');setTimeout(()=>window.close(),350)}return}catch(e){}}
+ await stop();if(returnUrl){try{const u=new URL(returnUrl);u.searchParams.set('scanCode',code);u.searchParams.set('scanContext',context);u.searchParams.set('scanTs',String(Date.now()));status('Detected '+code+' · returning to POS…','ok');setTimeout(()=>location.replace(u.toString()),220);return}catch(e){}}
+ status('Automatic return unavailable.','err');processing=false
 }
-
-async function stopScanner(){
-  if(!scanner) return;
-  try{ if(running) await scanner.stop(); }catch(e){}
-  try{ scanner.clear(); }catch(e){}
-  running = false;
-  scanner = null;
+window.addEventListener('message',e=>{if(!returnOrigin||e.origin!==returnOrigin||!e.data||e.data.type!=='FROZEN_POS_SCAN_RESULT')return;result(e.data);status(e.data.ok?'Ready for next item. Keep scanning.':'Not added. Correct item or scan another.',e.data.ok?'ok':'err');setTimeout(()=>processing=false,700)});
+async function start(){
+ processing=false;retryBtn.disabled=true;status('Requesting rear camera…');resultEl.className='result';
+ if(typeof Html5Qrcode==='undefined'){status('Scanner library failed to load.','err');retryBtn.disabled=false;return}
+ try{await stop();const f=[Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.QR_CODE];scanner=new Html5Qrcode('reader',{formatsToSupport:f,verbose:false});
+  try{await scanner.start({facingMode:{exact:'environment'}},{fps:12,qrbox:{width:300,height:150},aspectRatio:1.777778},decoded,()=>{})}catch(x){try{scanner.clear()}catch(e){}scanner=new Html5Qrcode('reader',{formatsToSupport:f,verbose:false});await scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:280,height:150}},decoded,()=>{})}
+  running=true;status(continuous?'Camera ready. Keep scanning until Done Scanning.':'Camera ready. Hold barcode inside scan area.');retryBtn.disabled=false
+ }catch(e){status('Camera failed: '+String(e&&e.message||e),'err');retryBtn.disabled=false}
 }
-
-async function sendBarcode(code){
-  code = String(code || '').trim();
-  if(!code || resolved) return;
-
-  const now = Date.now();
-  if(code === lastCode && now - lastAt < 1600) return;
-  lastCode = code; lastAt = now;
-  resolved = true;
-
-  try{ if(navigator.vibrate) navigator.vibrate([80,40,80]); }catch(e){}
-  setStatus('Detected: ' + code + ' · returning to POS…', 'ok');
-
-  await stopScanner();
-
-  try{
-    if(window.opener && !window.opener.closed && returnOrigin){
-      window.opener.postMessage(
-        {type:'FROZEN_POS_BARCODE', code, context},
-        returnOrigin
-      );
-      setTimeout(()=>window.close(), 250);
-      return;
-    }
-  }catch(e){}
-
-  // Messenger/Facebook and some in-app browsers deliberately remove window.opener.
-  // In that case, redirect this scanner tab back to the POS with only the scanned
-  // barcode + context. The POS consumes and removes these parameters after auth.
-  if(returnUrl){
-    try{
-      const u=new URL(returnUrl);
-      u.searchParams.set('scanCode',code);
-      u.searchParams.set('scanContext',context);
-      u.searchParams.set('scanTs',String(Date.now()));
-      setStatus('Detected: ' + code + ' · returning to POS…', 'ok');
-      setTimeout(()=>location.replace(u.toString()),220);
-      return;
-    }catch(e){}
-  }
-
-  setStatus('Detected: ' + code + '. Automatic return was blocked. Tap Close and return to the POS.', 'ok');
-  resolved = false;
-}
-
-async function startScanner(){
-  resolved = false;
-  retryBtn.disabled = true;
-  setStatus('Requesting rear camera…');
-
-  if(typeof Html5Qrcode === 'undefined'){
-    setStatus('Scanner library did not load. Check internet connection and retry.', 'err');
-    retryBtn.disabled = false;
-    return;
-  }
-
-  try{
-    await stopScanner();
-
-    const formats = [
-      Html5QrcodeSupportedFormats.EAN_13,
-      Html5QrcodeSupportedFormats.EAN_8,
-      Html5QrcodeSupportedFormats.UPC_A,
-      Html5QrcodeSupportedFormats.UPC_E,
-      Html5QrcodeSupportedFormats.CODE_128,
-      Html5QrcodeSupportedFormats.CODE_39,
-      Html5QrcodeSupportedFormats.QR_CODE
-    ];
-
-    scanner = new Html5Qrcode('reader', {
-      formatsToSupport: formats,
-      verbose: false
-    });
-
-    await scanner.start(
-      {facingMode:{exact:'environment'}},
-      {fps:12, qrbox:{width:300,height:150}, aspectRatio:1.777778},
-      sendBarcode,
-      ()=>{}
-    );
-
-    running = true;
-    setStatus('Camera ready. Hold the barcode inside the scan area.');
-  }catch(firstErr){
-    try{
-      await stopScanner();
-      scanner = new Html5Qrcode('reader', {verbose:false});
-      await scanner.start(
-        {facingMode:'environment'},
-        {fps:10, qrbox:{width:280,height:150}},
-        sendBarcode,
-        ()=>{}
-      );
-      running = true;
-      setStatus('Camera ready. Hold the barcode inside the scan area.');
-    }catch(secondErr){
-      const msg = String(secondErr && secondErr.message || secondErr || firstErr || '');
-      if(/notallowed|permission|denied/i.test(msg)){
-        setStatus('Camera permission is blocked. Allow Camera permission for this site, then tap Retry Camera.', 'err');
-      }else if(/notfound|camera/i.test(msg)){
-        setStatus('Rear camera could not be opened. Check browser camera permission and tap Retry Camera.', 'err');
-      }else{
-        setStatus('Camera failed to start: ' + msg, 'err');
-      }
-      retryBtn.disabled = false;
-    }
-  }
-}
-
-retryBtn.addEventListener('click', startScanner);
-document.getElementById('close').addEventListener('click', async ()=>{
-  await stopScanner();
-  window.close();
-});
-
-window.addEventListener('pagehide', stopScanner);
-
-// Auto-start. The POS opens this page from a direct user tap on Scan,
-// so mobile browsers can show the permission prompt immediately.
-window.addEventListener('load', ()=>setTimeout(startScanner, 120));
-</script>
-</body>
-</html>
+retryBtn.onclick=start;document.getElementById('done').onclick=async()=>{await stop();if(canTalkToPos){try{window.opener.postMessage({type:'FROZEN_POS_SCAN_DONE',context:context},returnOrigin)}catch(e){}window.close();return}if(returnUrl){location.replace(returnUrl);return}window.close()};
+window.addEventListener('pagehide',stop);window.addEventListener('load',()=>setTimeout(start,120));
+</script></body></html>
